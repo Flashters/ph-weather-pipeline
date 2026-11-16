@@ -55,6 +55,18 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def validate(payload: dict) -> bool:
+    """Validates that the API payload contains expected hourly weather keys."""
+    if not isinstance(payload, dict):
+        return False
+    hourly = payload.get("hourly")
+    if not isinstance(hourly, dict):
+        return False
+    
+    required_keys = ["time", "temperature_2m", "relative_humidity_2m", "precipitation"]
+    return all(k in hourly for k in required_keys)
+
+
 def extract_city(session: requests.Session, city: dict) -> dict:
     params = {
         "latitude": city["latitude"],
@@ -65,7 +77,11 @@ def extract_city(session: requests.Session, city: dict) -> dict:
     }
     response = session.get(API_URL, params=params, timeout=(10, 45))
     response.raise_for_status()
-    return response.json()
+    payload = response.json()
+
+    if not validate(payload):
+        raise ValueError(f"Invalid payload structure returned for {city['name']}")
+    return payload
 
 
 def transform_and_load(conn: sqlite3.Connection, city_name: str, payload: dict) -> int:
@@ -129,7 +145,7 @@ def run() -> None:
                 success_count += 1
             except Exception as exc:
                 print(f"WARN {name}: {exc}")
-            time.sleep(1.5)  # brief pacing between requests to prevent throttling
+            time.sleep(1.5)  # brief pacing between requests
 
         if success_count == 0:
             raise RuntimeError("All extractions failed")
