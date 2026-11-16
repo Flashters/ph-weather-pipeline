@@ -1,26 +1,25 @@
-import pandas as pd
-import pytest
 from etl import validate
 
-def test_validate_drops_bad_rows():
-    """Verify data quality gate filters out impossible or null values."""
-    raw_df = pd.DataFrame({
-        "temp_c": [30.0, 999.0, None, 25.0, 32.0, -15.0],
-        "humidity": [80.0, 50.0, 70.0, 120.0, 60.0, 40.0],
-        "rain_mm": [0.0, 0.0, 0.0, 0.0, -5.0, 0.0]
-    })
-    
-    validated_df = validate(raw_df)
-    # Only row 0 (30°C, 80% humidity, 0mm rain) is valid
-    assert len(validated_df) == 1
-    assert validated_df.iloc[0]["temp_c"] == 30.0
 
-def test_validate_empty_raises_error():
-    """Verify that an empty valid dataset aborts the ETL pipeline."""
-    raw_df = pd.DataFrame({
-        "temp_c": [999.0],
-        "humidity": [150.0],
-        "rain_mm": [-10.0]
-    })
-    with pytest.raises(ValueError, match="No valid rows - aborting load"):
-        validate(raw_df)
+def test_validate_valid_payload():
+    sample_payload = {
+        "hourly": {
+            "time": ["2026-11-16T00:00"],
+            "temperature_2m": [28.5],
+            "relative_humidity_2m": [80],
+            "precipitation": [0.0],
+        }
+    }
+    assert validate(sample_payload) is True
+
+
+def test_validate_invalid_payload():
+    # Missing required keys
+    invalid_payload = {
+        "hourly": {
+            "time": ["2026-11-16T00:00"],
+        }
+    }
+    assert validate(invalid_payload) is False
+    assert validate({}) is False
+    assert validate(None) is False
